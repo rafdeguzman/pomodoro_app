@@ -55,13 +55,6 @@ class RadialProgress extends StatelessWidget {
                   color: color,
                 ),
               ),
-              Text(
-                '${(progress * 100).toInt()}%',
-                style: TextStyle(
-                  fontSize: size / 10,
-                  color: color,
-                ),
-              ),
             ],
           ),
         ],
@@ -190,14 +183,9 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   Timer? _timer;
   Duration _duration = Duration.zero;
-  static const _maxDuration = Duration(minutes: 1); // 1 hour timer
-  // static const _maxDuration = Duration(hours: 1); // 1 hour timer
-
-  @override
-  void initState() {
-    super.initState();
-    startTimer();
-  }
+  static const _maxDuration = Duration(seconds: 10); // 10 seconds
+  bool _isSessionActive = false;
+  bool _isSessionCompleted = false;
 
   @override
   void dispose() {
@@ -205,23 +193,38 @@ class _MyHomePageState extends State<MyHomePage> {
     super.dispose();
   }
 
-  void startTimer() {
+  void startSession() {
+    setState(() {
+      _isSessionActive = true;
+      _isSessionCompleted = false;
+      _duration = Duration.zero;
+    });
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() {
         if (_duration < _maxDuration) {
           _duration += const Duration(seconds: 1);
-        } else {
-          _timer?.cancel();
+          if (_duration == _maxDuration) {
+            _timer?.cancel();
+            _isSessionActive = false;
+            _isSessionCompleted = true;
+          }
         }
       });
     });
   }
 
-  void resetTimer() {
+  void endSession() {
+    _timer?.cancel();
     setState(() {
-      _timer?.cancel();
+      _isSessionActive = false;
+      _isSessionCompleted = _duration == _maxDuration;
+    });
+  }
+
+  void completeSession() {
+    setState(() {
       _duration = Duration.zero;
-      startTimer();
+      _isSessionCompleted = false;
     });
   }
 
@@ -239,7 +242,7 @@ class _MyHomePageState extends State<MyHomePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             const Text(
-              'Timer Progress:',
+              'Session Progress:',
               style: TextStyle(fontSize: 20),
             ),
             const SizedBox(height: 20),
@@ -250,13 +253,46 @@ class _MyHomePageState extends State<MyHomePage> {
               size: 250,
               strokeWidth: 25,
             ),
+            const SizedBox(height: 30),
+            _buildSessionButton(),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: resetTimer,
-        tooltip: 'Reset Timer',
-        child: const Icon(Icons.refresh),
+    );
+  }
+
+  Widget _buildSessionButton() {
+    String buttonText;
+    Color buttonColor;
+    VoidCallback onPressed;
+
+    if (_isSessionActive) {
+      buttonText = 'End Session';
+      buttonColor = Colors.grey;
+      onPressed = endSession;
+    } else if (_isSessionCompleted) {
+      buttonText = 'Complete Session';
+      buttonColor = Colors.green;
+      onPressed = completeSession;
+    } else {
+      buttonText = 'Start Session';
+      buttonColor = Colors.blue;
+      onPressed = startSession;
+    }
+
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: buttonColor,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+      ),
+      child: Text(
+        buttonText,
+        style: const TextStyle(fontSize: 18),
       ),
     );
   }
