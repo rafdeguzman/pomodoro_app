@@ -180,30 +180,46 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MyHomePageState extends State<MyHomePage>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
   Timer? _timer;
-  Duration _duration = Duration.zero;
-  static const _maxDuration = Duration(seconds: 10); // 10 seconds
+  int _seconds = 0;
+  int _maxSeconds = 10; // Default session length
   bool _isSessionActive = false;
   bool _isSessionCompleted = false;
 
   @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(vsync: this);
+    _updateAnimationDuration();
+  }
+
+  @override
   void dispose() {
     _timer?.cancel();
+    _animationController.dispose();
     super.dispose();
+  }
+
+  void _updateAnimationDuration() {
+    _animationController.duration = Duration(seconds: _maxSeconds);
   }
 
   void startSession() {
     setState(() {
       _isSessionActive = true;
       _isSessionCompleted = false;
-      _duration = Duration.zero;
+      _seconds = 0;
     });
+    _animationController.reset();
+    _animationController.forward();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() {
-        if (_duration < _maxDuration) {
-          _duration += const Duration(seconds: 1);
-          if (_duration == _maxDuration) {
+        if (_seconds < _maxSeconds) {
+          _seconds++;
+          if (_seconds == _maxSeconds) {
             _timer?.cancel();
             _isSessionActive = false;
             _isSessionCompleted = true;
@@ -215,23 +231,23 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void endSession() {
     _timer?.cancel();
+    _animationController.stop();
     setState(() {
       _isSessionActive = false;
-      _isSessionCompleted = _duration == _maxDuration;
+      _isSessionCompleted = _seconds == _maxSeconds;
     });
   }
 
   void completeSession() {
     setState(() {
-      _duration = Duration.zero;
+      _seconds = 0;
       _isSessionCompleted = false;
     });
+    _animationController.reset();
   }
 
   @override
   Widget build(BuildContext context) {
-    double progress = _duration.inSeconds / _maxDuration.inSeconds;
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
@@ -246,18 +262,51 @@ class _MyHomePageState extends State<MyHomePage> {
               style: TextStyle(fontSize: 20),
             ),
             const SizedBox(height: 20),
-            RadialProgress(
-              progress: progress,
-              duration: _duration,
-              color: Colors.deepPurple,
-              size: 250,
-              strokeWidth: 25,
+            AnimatedBuilder(
+              animation: _animationController,
+              builder: (context, child) {
+                return RadialProgress(
+                  progress: _animationController.value,
+                  duration: Duration(seconds: _seconds),
+                  color: Colors.deepPurple,
+                  size: 250,
+                  strokeWidth: 25,
+                );
+              },
             ),
             const SizedBox(height: 30),
             _buildSessionButton(),
+            const SizedBox(height: 20),
+            _buildSessionLengthSlider(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSessionLengthSlider() {
+    return Column(
+      children: [
+        Text(
+          'Session Length: $_maxSeconds seconds',
+          style: const TextStyle(fontSize: 16),
+        ),
+        Slider(
+          value: _maxSeconds.toDouble(),
+          min: 5,
+          max: 60,
+          divisions: 11,
+          label: _maxSeconds.toString(),
+          onChanged: _isSessionActive
+              ? null
+              : (double value) {
+                  setState(() {
+                    _maxSeconds = value.round();
+                    _updateAnimationDuration();
+                  });
+                },
+        ),
+      ],
     );
   }
 
